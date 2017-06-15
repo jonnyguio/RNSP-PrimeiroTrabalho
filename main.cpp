@@ -7,10 +7,24 @@
 #include <thread>
 #include <chrono>
 
-const int numThreads = 4;
-const int numBitsAddrs = 4;
-const int threshold = 98;
-const bool bleaching = true;
+template<typename TimeT = std::chrono::milliseconds>
+struct measure
+{
+    template<typename F, typename ...Args>
+    static typename TimeT::rep execution(F&& func, Args&&... args)
+    {
+        auto start = std::chrono::steady_clock::now();
+        std::forward<decltype(func)>(func)(std::forward<Args>(args)...);
+        auto duration = std::chrono::duration_cast< TimeT> 
+                            (std::chrono::steady_clock::now() - start);
+        return duration.count();
+    }
+};
+
+int numThreads = 4;
+int numBitsAddrs = 16;
+int threshold = 98;
+bool bleaching = true;
 
 using namespace wann;
 
@@ -32,6 +46,31 @@ void reverseInt(int *input) {
     c4 = ((*input) >> 24) & 255;
     
     *input = ((int) c1 << 24) + ((int) c2 << 16) + ((int) c3 << 8) + ((int) c4); 
+}
+
+void convertMNISTBinary(std::vector<std::vector<int>> input, std::vector<std::vector<int>> &output) {
+    // We are converting the input data, that contain values from 0 to 255 to binary.
+    // Therefore, we need to multiply each line of vector to 64
+    // basically, multiplying the columns and the rows by 8 
+    int aux, count;
+    output.resize(input.size(), std::vector<int>(input[0].size() * 64, 0));
+    
+    for (int i = 0; i < input.size(); i++) {
+        for (int j = 0; j < input[0].size(); j++) {
+            aux = input[i][j];
+            count = 0;
+            while (aux > 0) {
+                output[i][j + count] = aux % 2;
+                aux /= 2;
+                count++;
+            }
+            for (int k = 0; k <= count / 2; k++) {
+                aux = output[i][j + k];
+                output[i][j + k] = output[i][j + count - k]; 
+                output[i][j + count - k] = aux;
+            }
+        }
+    }
 }
 
 void readLabelsMNIST(const char *filename, std::vector<std::string> &v) {
@@ -172,7 +211,7 @@ void parallel() {
 
 void sequential() {
     int count = 0;
-    std::vector<std::vector<int>> trainingImages, testImages;
+    std::vector<std::vector<int>> trainingImages, testImages, trainingImagesExtended, testImagesExtended;
     std::vector<std::string> trainingLabels, testLabels, result;
 
     readLabelsMNIST("./mnist/train-labels-idx1-ubyte", trainingLabels);
@@ -181,26 +220,28 @@ void sequential() {
     readImagesMNIST("./mnist/t10k-images-idx3-ubyte", testImages);
 
     std::cout << "Preparing it to WiSARD..." << std::endl;
-    for (int i = 0; i < trainingImages.size(); i++) {
-        for (int j = 0; j < trainingImages[0].size(); j++) {
-            if (trainingImages[i][j] < threshold) {
-                trainingImages[i][j] = 0;
-            }
-            else {
-                trainingImages[i][j] = 1;
-            }
-        }
-    }
+    // for (int i = 0; i < trainingImages.size(); i++) {
+    //     for (int j = 0; j < trainingImages[0].size(); j++) {
+    //         if (trainingImages[i][j] < threshold) {
+    //             trainingImages[i][j] = 0;
+    //         }
+    //         else {
+    //             trainingImages[i][j] = 1;
+    //         }
+    //     }
+    // }
+    convertMNISTBinary(trainingImages, trainingImagesExtended);
+    convertMNISTBinary(testImages, testImagesExtended);
 
-    WiSARD *w = new WiSARD(trainingImages[0].size(), numBitsAddrs, bleaching);
+    WiSARD *w = new WiSARD(trainingImagesExtended[0].size(), numBitsAddrs, bleaching);
 
     // std::cout << trainingImages[0].size() << " " << trainingImages.size() << " " << trainingLabels.size() << std::endl;
 
     std::cout << "Training..." << std::endl;
-    w->fit(trainingImages, trainingLabels);
+    w->fit(trainingImagesExtended, trainingLabels);
 
     std::cout << "Prediction..." << std::endl;
-    result = w->predict(testImages);
+    result = w->predict(testImagesExtended);
 
     for (int i = 0; i < testLabels.size(); i++) {
         if (testLabels[i] == result[i]) {
@@ -220,12 +261,40 @@ void sequential() {
 int main(int argc, char *argv[]) {
 
     if (argc > 1) {
+        if (argc > 2) {
+            numBitsAddrs = atoi(argv[2]);
+            if (argc > 3) {
+                if (argv[3][0] == '0') {
+                    bleaching = false;
+                }
+                else {
+                    if (argv[3][0] != '1') {
+                        std::cout << "Wrong argument. Use 0 for false and 1 for true" << std::endl;
+                        return 0;
+                    }
+                }
+                if (argc > 4) {
+                    numThreads = atoi(argv[4]);
+                }
+            }
+        }
         if (argv[1][0] == '1') {
-            parallel();
+            std::cout << measure<std::chrono::milliseconds>::execution(parallel) / 1000 << " seconds." << std::endl;
+            // parallel()
         }
         else {
-            sequential();
+            if (argv[1][0] == '0') {
+               std::cout << measure<std::chrono::milliseconds>::execution(sequential) / 1000 << " seconds." << std::endl;
+            }
+            else {
+                std::cout << "Wrong argument. Use 0 for sequential or 1 for parallel execution" << std::endl;
+                return 0;
+            }
+            // sequential();
         }
-    return 0;
     }
+    else {
+        std::cout << "usage: " << argv[0] << " <0 = sequential, 1 = parallel> [<numBitsAddrs> <bleaching, 0 = false, 1 = true> <numThreads>]" << std::endl;
+    }
+    return 0;
 }
