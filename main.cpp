@@ -8,7 +8,7 @@
 #include <chrono>
 
 const int numThreads = 4;
-const int numBitsAddrs = 4;
+const int numBitsAddrs = 2;
 const int threshold = 98;
 const bool bleaching = true;
 
@@ -124,7 +124,7 @@ void parallel() {
     
     WiSARD *w[numThreads];
     for (int i = 0; i < numThreads; i++) {
-        w[i] = new WiSARD(trainingImages[0].size(), numBitsAddrs, bleaching);
+        w[i] = new WiSARD(numBitsAddrs, bleaching);
     }
 
     // std::cout << trainingImages[0].size() << " " << trainingImages.size() << " " << trainingLabels.size() << std::endl;
@@ -192,7 +192,7 @@ void sequential() {
         }
     }
 
-    WiSARD *w = new WiSARD(trainingImages[0].size(), numBitsAddrs, bleaching);
+    WiSARD *w = new WiSARD(numBitsAddrs, bleaching);
 
     // std::cout << trainingImages[0].size() << " " << trainingImages.size() << " " << trainingLabels.size() << std::endl;
 
