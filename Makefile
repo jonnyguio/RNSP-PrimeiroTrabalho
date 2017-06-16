@@ -16,7 +16,7 @@ CC       = g++
 CFLAGS   = -std=c++11 -Wall -I. -I include -g -v
 
 LINKER   = g++
-LFLAGS   = -Wall -I. -lwann
+LFLAGS   = -std=c++11 -Wall -I. -lwann
 
 # change these to proper directories where each file should be
 SRCDIR   = src
@@ -25,7 +25,7 @@ BINDIR   = bin
 
 SOURCES  := $(wildcard $(SRCDIR)/*.cpp)
 INCLUDES := $(wildcard $(SRCDIR)/*.h)
-OBJECTS  := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+OBJECTS  := $(SOURCES:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
 rm       = rm -f
 
 
