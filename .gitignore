@@ -33,3 +33,9 @@
 
 # VSCODE
 .vscode
+
+# Mac OS Sierra
+.DS_Store
+
+# Results
+*.txt

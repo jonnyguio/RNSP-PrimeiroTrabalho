@@ -12,11 +12,11 @@
 # ------------------------------------------------
 
 TARGET   = mnistWisard.out
-CC       = g++
-CFLAGS   = -std=c++11 -Wall -I. -I include -g -v
+CC       = clang++
+CFLAGS   = -std=c++11 -stdlib=libc++ -Wall -I. -I include -g
 
-LINKER   = g++
-LFLAGS   = -std=c++11 -Wall -I. -lwann
+LINKER   = clang++
+LFLAGS   = -std=c++11 -stdlib=libc++ -Wall -I. -lwann
 
 # change these to proper directories where each file should be
 SRCDIR   = src
