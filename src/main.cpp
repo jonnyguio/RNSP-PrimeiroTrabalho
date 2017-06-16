@@ -289,6 +289,9 @@ int main(int argc, char *argv[]) {
                         extended = (argv[5][0] == '0') ? false : true;
                         if (argc > 6 ) {
                             numThreads = atoi(argv[6]);
+                            if (argc > 7) {
+                                threshold = atoi(argv[7]);
+                            }
                         }
                     }
                 }
@@ -308,7 +311,7 @@ int main(int argc, char *argv[]) {
         }
     }
     else {
-        std::cout << "usage: " << argv[0] << " <0 = sequential, 1 = parallel> [<numBitsAddrs> <bleaching, 0 = false, >1 = size of bleaching> <confidenceThreshold> <extend images> <numThreads>]" << std::endl;
+        std::cout << "usage: " << argv[0] << " <0 = sequential, 1 = parallel> [<numBitsAddrs> <bleaching, 0 = false, >1 = size of bleaching> <confidenceThreshold> <extend images> <numThreads> <threshold>]" << std::endl;
     }
     return 0;
 }
