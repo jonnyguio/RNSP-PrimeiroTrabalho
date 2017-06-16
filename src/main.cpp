@@ -224,7 +224,7 @@ void parallel() {
         }
         std::cout << std::endl;
     }
-    std::cout << "Rights: ";
+    if (DEBUG) std::cout << "Rights: ";
     for (int i = 0; i < numThreads; i++) {
         for (int j = 0; j < resultPartial[0].size(); j++) {
             if (testLabels[i * resultPartial[0].size() + j] == resultPartial[i][j]) {
@@ -260,7 +260,7 @@ void sequential() {
     if (DEBUG) std::cout << "Prediction..." << std::endl;
     result = w->predict((extended) ? testImagesExtended : testImages);
 
-    std::cout << "Rights: ";
+    if (DEBUG) std::cout << "Rights: ";
     for (int i = 0; i < testLabels.size(); i++) {
         if (testLabels[i] == result[i]) {
             count++;
