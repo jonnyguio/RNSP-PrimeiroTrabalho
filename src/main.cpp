@@ -8,6 +8,8 @@
 #include <mutex>
 #include <chrono>
 
+#define DEBUG 0
+
 template<typename TimeT = std::chrono::milliseconds>
 struct measure
 {
@@ -27,24 +29,28 @@ const char
     *trainImagesFilename = "./mnist/train-images-idx3-ubyte", 
     *testLabelsFilename = "./mnist/t10k-labels-idx1-ubyte",
     *testImagesFilename = "./mnist/t10k-images-idx3-ubyte";
+
 int numThreads = 4;
 int numBitsAddrs = 16;
 int threshold = 98;
 bool bleaching = true;
 bool extended = false;
+int defaultBleaching = 1;
+float confidenceThreshold = 0.1;
+
 std::mutex resultMutex;
 
 using namespace wann;
 
 void executePartial(int threadID, std::vector<std::vector<int>> array, std::vector< std::vector<std::string> > *result, WiSARD *w) {
     std::vector<std::string> res;
-    std::cout << "Starting prediction..." << std::endl;
+    if (DEBUG) std::cout << "Starting prediction..." << std::endl;
     res = w->predict(array);
-    std::cout << "Finished predict, adding to list" << std::endl;
+    if (DEBUG) std::cout << "Finished predict, adding to list" << std::endl;
     resultMutex.lock();
     (*result)[threadID] = res;
     resultMutex.unlock();
-    std::cout << "Exiting..." << std::endl;
+    if (DEBUG) std::cout << "Exiting..." << std::endl;
 }
 
 void reverseInt(int *input) {
@@ -83,30 +89,6 @@ void convertMNISTBinary(std::vector<std::vector<int>> input, std::vector<std::ve
     }
 }
 
-void readLabelsMNIST(const char *filename, std::vector<std::string> &v) {
-    unsigned char temp;
-    int magicNumber = 0, numOfLabels = 0;
-    std::ifstream file(filename, std::ios::binary);
-
-    if (file.is_open()) {
-        file.read((char *) &magicNumber, sizeof(magicNumber));
-        reverseInt(&magicNumber);
-        file.read((char *) &numOfLabels, sizeof(numOfLabels));
-        reverseInt(&numOfLabels);
-        v.resize(numOfLabels);
-        std::cout << "Number of labels: " << numOfLabels << std::endl;
-        for (int i = 0; i < numOfLabels; i++) {
-            temp = 0;
-            file.read((char *) &temp, sizeof(temp));
-            // std::cout << temp << std::endl;
-            v[i] = std::to_string((int) temp);
-        }
-    }
-    else {
-        std::cout << "File not found: " << filename << std::endl;
-    }
-}
-
 void prepareToWisard(std::vector< std::vector < int > > &images, std::vector< std::vector < int > > &imagesExtended) {
     if (!extended) {
         for (int i = 0; i < images.size(); i++) {
@@ -125,6 +107,30 @@ void prepareToWisard(std::vector< std::vector < int > > &images, std::vector< st
     }
 }
 
+void readLabelsMNIST(const char *filename, std::vector<std::string> &v) {
+    unsigned char temp;
+    int magicNumber = 0, numOfLabels = 0;
+    std::ifstream file(filename, std::ios::binary);
+
+    if (file.is_open()) {
+        file.read((char *) &magicNumber, sizeof(magicNumber));
+        reverseInt(&magicNumber);
+        file.read((char *) &numOfLabels, sizeof(numOfLabels));
+        reverseInt(&numOfLabels);
+        v.resize(numOfLabels);
+        if (DEBUG) std::cout << "Number of labels: " << numOfLabels << std::endl;
+        for (int i = 0; i < numOfLabels; i++) {
+            temp = 0;
+            file.read((char *) &temp, sizeof(temp));
+            // std::cout << temp << std::endl;
+            v[i] = std::to_string((int) temp);
+        }
+    }
+    else {
+        std::cout << "File not found: " << filename << std::endl;
+    }
+}
+
 void readImagesMNIST(const char *filename, std::vector<std::vector<int>> &array) {
     unsigned char temp;
     int magicNumber = 0, numOfImages = 0, rows = 0, columns = 0; 
@@ -140,7 +146,7 @@ void readImagesMNIST(const char *filename, std::vector<std::vector<int>> &array)
         file.read((char *) &columns, sizeof(columns));
         reverseInt(&columns);
         array.resize(numOfImages, std::vector<int>(rows * columns));
-        std::cout << "Number of images, rows and columns: " << numOfImages << ", " << rows << ", " << columns << std::endl;  
+        if (DEBUG) std::cout << "Number of images, rows and columns: " << numOfImages << ", " << rows << ", " << columns << std::endl;  
         for (int i = 0; i < numOfImages; i++) {
             for (int r = 0; r < rows; r++) {
                 for (int c = 0; c < columns; c++) {
@@ -180,17 +186,17 @@ void parallel() {
     // tTestLabels.join();
     // tTestImages.join();
 
-    std::cout << "Preparing it to WiSARD..." << std::endl;
+    if (DEBUG) std::cout << "Preparing it to WiSARD..." << std::endl;
     
     prepareToWisard(trainingImages, trainingImagesExtended);
     prepareToWisard(testImages, testImagesExtended);
 
-    WiSARD *w = new WiSARD((extended) ? trainingImagesExtended[0].size() : trainingImages[0].size(), numBitsAddrs, bleaching);
+    WiSARD *w = new WiSARD((extended) ? trainingImagesExtended[0].size() : trainingImages[0].size(), numBitsAddrs, bleaching, confidenceThreshold, defaultBleaching);
 
-    std::cout << "Training..." << std::endl;
+    if (DEBUG) std::cout << "Training..." << std::endl;
     w->fit((extended) ? trainingImagesExtended : trainingImages, trainingLabels);
 
-    std::cout << "Prediction..." << std::endl;
+    if (DEBUG) std::cout << "Prediction..." << std::endl;
 
     for (int i = 0; i < numThreads; i++) {
         if (!extended) {
@@ -210,13 +216,15 @@ void parallel() {
         prediction[i]->join();
     }
 
-    std::cout << "Finished, counting right answers (" << numThreads << "):" << std::endl; 
-    std::cout << "\t";
-    for (int i = 0; i < numThreads; i++) {
-        std::cout << resultPartial[i].size() << " ";
+    if (DEBUG) {
+        std::cout << "Finished, counting right answers (" << numThreads << "):" << std::endl; 
+        std::cout << "\t";
+        for (int i = 0; i < numThreads; i++) {
+            std::cout << resultPartial[i].size() << " ";
+        }
+        std::cout << std::endl;
     }
-    std::cout << std::endl;
-
+    std::cout << "Rights: ";
     for (int i = 0; i < numThreads; i++) {
         for (int j = 0; j < resultPartial[0].size(); j++) {
             if (testLabels[i * resultPartial[0].size() + j] == resultPartial[i][j]) {
@@ -224,8 +232,7 @@ void parallel() {
             }
         }
     }
-
-    std::cout << "Rights: " << count << std::endl;
+    std::cout << count << std::endl;
 
     delete w;
 }
@@ -240,17 +247,17 @@ void sequential() {
     readLabelsMNIST(testLabelsFilename, testLabels);
     readImagesMNIST(testImagesFilename, testImages);
 
-    std::cout << "Preparing it to WiSARD..." << std::endl;
+    if (DEBUG) std::cout << "Preparing it to WiSARD..." << std::endl;
 
     prepareToWisard(trainingImages, trainingImagesExtended);
     prepareToWisard(testImages, testImagesExtended);
     
-    WiSARD *w = new WiSARD((extended) ? trainingImagesExtended[0].size() : trainingImages[0].size(), numBitsAddrs, bleaching);
+    WiSARD *w = new WiSARD((extended) ? trainingImagesExtended[0].size() : trainingImages[0].size(), numBitsAddrs, bleaching, confidenceThreshold, defaultBleaching);
 
-    std::cout << "Training..." << std::endl;
+    if (DEBUG) std::cout << "Training..." << std::endl;
     w->fit((extended) ? trainingImagesExtended : trainingImages, trainingLabels);
 
-    std::cout << "Prediction..." << std::endl;
+    if (DEBUG) std::cout << "Prediction..." << std::endl;
     result = w->predict((extended) ? testImagesExtended : testImages);
 
     std::cout << "Rights: ";
@@ -274,15 +281,15 @@ int main(int argc, char *argv[]) {
                     bleaching = false;
                 }
                 else {
-                    if (argv[3][0] != '1') {
-                        std::cout << "Wrong argument. Use 0 for false and 1 for true" << std::endl;
-                        return 0;
-                    }
+                    defaultBleaching = atoi(argv[3]);
                 }
                 if (argc > 4) {
-                    extended = (argv[4][0] == '0') ? false : true;
-                    if (argc > 5 ) {
-                        numThreads = atoi(argv[5]);
+                    confidenceThreshold = atof(argv[4]);
+                    if (argc > 5) {
+                        extended = (argv[5][0] == '0') ? false : true;
+                        if (argc > 6 ) {
+                            numThreads = atoi(argv[6]);
+                        }
                     }
                 }
             }
@@ -301,7 +308,7 @@ int main(int argc, char *argv[]) {
         }
     }
     else {
-        std::cout << "usage: " << argv[0] << " <0 = sequential, 1 = parallel> [<numBitsAddrs> <bleaching, 0 = false, 1 = true> <extend images> <numThreads>]" << std::endl;
+        std::cout << "usage: " << argv[0] << " <0 = sequential, 1 = parallel> [<numBitsAddrs> <bleaching, 0 = false, >1 = size of bleaching> <confidenceThreshold> <extend images> <numThreads>]" << std::endl;
     }
     return 0;
 }
