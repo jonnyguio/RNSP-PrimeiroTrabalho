@@ -245,4 +245,4 @@ for frase in matrizDeFrases:
 # 	print
 
 GeraVetorDaRNSP(matrizDeFrasesFinalPalavra, '/home/rgaio/Desktop/treino-palavras', '/home/rgaio/Desktop/teste-palavras')
-#GeraVetorDaRNSP(matrizDeFrasesFinalTag, '/home/rgaio/Desktop/treino-tags', '/home/rgaio/Desktop/teste-tags')
+GeraVetorDaRNSP(matrizDeFrasesFinalTag, '/home/rgaio/Desktop/treino-tags', '/home/rgaio/Desktop/teste-tags')
